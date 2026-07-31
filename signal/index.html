@@ -93,6 +93,9 @@ HEADLINE OPTIONS (3, per brief):
 *,*::before,*::after{box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+/* the header is sticky, so a jump link would otherwise park the section heading
+   underneath it. The header measures 75px at every width on this page. */
+#top,#services,#coverage,#company,#careers,#portal,#contact,#clients,#process{scroll-margin-top:87px}
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font:500 16px/1.7 "Archivo",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -172,10 +175,17 @@ header.site .wrap{display:flex;align-items:center;gap:26px;min-height:74px}
 nav.main{margin-left:auto}
 nav.main ul{list-style:none;display:flex;gap:6px;margin:0;padding:0}
 nav.main a{
+  position:relative;
   display:block;padding:10px 13px;color:#dcebf3;text-decoration:none;font-family:"Jost",sans-serif;
   font-weight:500;font-size:1rem;border-radius:8px;
 }
 nav.main a:hover{color:#fff;background:rgba(255,255,255,.09)}
+/* the reading position — drawn in the nav and announced to assistive tech as
+   aria-current="location" so the page never loses the reader's place */
+nav.main a::after{content:"";position:absolute;left:13px;right:calc(100% - 13px);bottom:5px;height:2px;
+  background:var(--teal);border-radius:2px;transition:right .22s ease}
+nav.main a:hover::after,nav.main a.on::after{right:13px}
+nav.main a.on{color:#fff}
 .header-cta{background:var(--cta);color:#fff;font-family:"Jost",sans-serif;font-weight:700;font-size:1rem;
   padding:11px 20px;border-radius:9px;text-decoration:none;flex:none;transition:background .18s,transform .18s}
 .header-cta:hover{background:var(--cta-hover);color:#fff;transform:translateY(-1px)}
@@ -191,7 +201,13 @@ nav.main a:hover{color:#fff;background:rgba(255,255,255,.09)}
     border-bottom:1px solid rgba(173,209,224,.2);display:none;margin:0}
   nav.main.open{display:block}
   nav.main ul{flex-direction:column;gap:0;padding:10px 18px 16px}
-  nav.main a{padding:13px 10px;font-size:1.08rem;border-bottom:1px solid rgba(173,209,224,.12)}
+  nav.main a{padding:13px 10px 13px 16px;font-size:1.08rem;border-bottom:1px solid rgba(173,209,224,.12)}
+  /* in the drawer the rows already carry a bottom rule, so the reading position
+     reads as a left marker instead of an underline that would fight it */
+  nav.main a::after{left:0;right:auto;top:9px;bottom:9px;width:3px;height:auto;
+    transform:scaleY(0);transform-origin:top;transition:transform .18s ease}
+  nav.main a:hover::after,nav.main a.on::after{right:auto;transform:scaleY(1)}
+  nav.main a.on{background:rgba(0,161,191,.16)}
   .header-cta{display:none}
   .u-right .portal-link{display:none}
   nav.main .nav-extra{display:block}
@@ -200,6 +216,8 @@ nav.main a:hover{color:#fff;background:rgba(255,255,255,.09)}
   .nav-extra .nav-cta:hover{background:var(--cta-hover)}
 }
 .nav-extra{display:none}
+/* after the drawer block so it wins over the drawer's own transition */
+@media (prefers-reduced-motion: reduce){ nav.main a::after{transition:none} }
 
 /* who runs ICS — real accountability without inventing people */
 .who{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,26px)}
@@ -1354,6 +1372,36 @@ html.js .reveal.in{opacity:1;transform:none}
       else if (e.shiftKey && active === first){ e.preventDefault(); last.focus(); }
     }
   });
+
+  /* scroll spy: mark the section being read, for sighted readers and for AT.
+     Only the primary jump links — the drawer's portal link and orange CTA both
+     point at sections too, but they are actions, not a reading position. */
+  var navLinks = [].slice.call(document.querySelectorAll("nav.main li:not(.nav-extra) a[href^='#']"));
+  var spyTargets = navLinks.map(function (a) {
+    try { return document.querySelector(a.getAttribute("href")); } catch (e) { return null; }
+  });
+  if (navLinks.length){
+    var spyTicking = false;
+    var markActive = function (){
+      spyTicking = false;
+      var line = window.scrollY + window.innerHeight * 0.3;
+      var idx = -1;
+      for (var i = 0; i < spyTargets.length; i++){
+        var t = spyTargets[i];
+        if (t && t.getBoundingClientRect().top + window.scrollY <= line) idx = i;
+      }
+      for (var j = 0; j < navLinks.length; j++){
+        var on = j === idx;
+        navLinks[j].classList.toggle("on", on);
+        if (on) navLinks[j].setAttribute("aria-current", "location");
+        else navLinks[j].removeAttribute("aria-current");
+      }
+    };
+    var onSpy = function (){ if (!spyTicking){ spyTicking = true; requestAnimationFrame(markActive); } };
+    window.addEventListener("scroll", onSpy, { passive: true });
+    window.addEventListener("resize", onSpy);
+    markActive();
+  }
 
   /* scroll reveals — choreography for real users; capture-safety only for
      automated capture (navigator.webdriver: screenshot harness / print pipelines) */
