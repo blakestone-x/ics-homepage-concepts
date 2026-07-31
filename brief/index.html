@@ -98,13 +98,36 @@ header.site .wrap{display:flex;align-items:center;gap:16px;min-height:70px}
 .brand-cat{display:block;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
   padding-left:14px;border-left:1px solid var(--rule);white-space:nowrap}
 @media (max-width:480px){ .brand-cat{display:none} }
-nav.main{display:none;margin-left:auto;gap:20px}
+nav.main{display:flex;margin-left:auto;gap:20px}
+/* the reading position, shown in the nav and announced to assistive tech */
+nav.main a{position:relative;padding:10px 0}
+nav.main a::after{content:"";position:absolute;left:0;right:100%;bottom:2px;height:2px;
+  background:var(--teal);transition:right .22s ease}
+nav.main a:hover::after,nav.main a.on::after{right:0}
+nav.main a.on{color:var(--teal)}
+/* below the desktop breakpoint the sections used to be unreachable — no nav, no toggle.
+   They now sit on their own scrollable row rather than behind a menu the reader must open. */
+@media (max-width:1179px){
+  header.site .wrap{flex-wrap:wrap;row-gap:0}
+  nav.main{order:3;width:100%;margin-left:0;gap:22px;margin-top:8px;padding-top:2px;
+    border-top:1px solid var(--rule);overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch}
+  nav.main::-webkit-scrollbar{display:none}
+  nav.main a{white-space:nowrap;padding:12px 0}
+}
+@media (prefers-reduced-motion: reduce){ nav.main a::after{transition:none} }
 nav.main a{font-size:.93rem;color:var(--ink);text-decoration:none;white-space:nowrap}
 nav.main a:hover{color:var(--teal)}
-@media (min-width:1180px){ nav.main{display:flex} }
+
 .hd-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 @media (min-width:1180px){ .hd-right{margin-left:0} }
-@media (max-width:560px){ .hd-right .btn-primary{display:none} }
+/* the header CTA used to be dropped on phones to stop the row overflowing. With the
+   sections on their own row there is space for it again, at a compact size. */
+@media (max-width:560px){
+  .hd-right{gap:8px}
+  .hd-right .btn-primary{padding:9px 13px;font-size:.85rem}
+  .brand span span{display:none}
+}
 .tbtn{width:36px;height:36px;display:grid;place-items:center;background:transparent;border:1px solid var(--rule);
   border-radius:3px;color:var(--ink-2);cursor:pointer}
 .tbtn:hover{border-color:var(--teal);color:var(--teal)}
@@ -670,6 +693,34 @@ html:not(.js) .rv{opacity:1;transform:none}
     try { localStorage.setItem("ics-brief-theme", next); } catch(e){}
     syncBtn();
   });
+
+  /* scroll spy: mark the section being read, for sighted readers and for AT */
+  var navLinks = [].slice.call(document.querySelectorAll("nav.main a[href^='#']"));
+  var targets = navLinks.map(function (a) {
+    try { return document.querySelector(a.getAttribute("href")); } catch (e) { return null; }
+  });
+  if (navLinks.length) {
+    var spyTicking = false;
+    var markActive = function () {
+      spyTicking = false;
+      var line = window.scrollY + window.innerHeight * 0.3;
+      var idx = -1;
+      for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        if (t && t.getBoundingClientRect().top + window.scrollY <= line) idx = i;
+      }
+      for (var j = 0; j < navLinks.length; j++) {
+        var on = j === idx;
+        navLinks[j].classList.toggle("on", on);
+        if (on) navLinks[j].setAttribute("aria-current", "location");
+        else navLinks[j].removeAttribute("aria-current");
+      }
+    };
+    var onSpy = function () { if (!spyTicking) { spyTicking = true; requestAnimationFrame(markActive); } };
+    window.addEventListener("scroll", onSpy, { passive: true });
+    window.addEventListener("resize", onSpy);
+    markActive();
+  }
 
   /* reveal — rect check on scroll rather than IntersectionObserver, which can miss
      transient intersections on fast or programmatic scrolling and leave content invisible. */
