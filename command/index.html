@@ -67,6 +67,13 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* the header is sticky, so a jump link from the nav or the menu would otherwise
+   park the section heading underneath it. It measures 62-77px down to 480px and
+   grows to ~107px below that, where the wordmark wraps. */
+#top,#clients,#network,#call,#capabilities,#coverage,#broker,#cycle,#access,#casefile,#team,#contact{scroll-margin-top:90px}
+@media (max-width:479px){
+  #top,#clients,#network,#call,#capabilities,#coverage,#broker,#cycle,#access,#casefile,#team,#contact{scroll-margin-top:120px}
+}
 html,body{overflow-x:clip}
 body{
   background:var(--bg0); color:var(--ink); font-family:var(--sans);
@@ -135,10 +142,23 @@ header.site.scrolled{
 nav.main{display:none; gap:26px; margin-left:26px}
 @media (min-width:1100px){nav.main{display:flex}}
 nav.main a{
+  position:relative; display:block;
   font:500 13px var(--sans); color:var(--ink2); letter-spacing:.02em;
-  padding:6px 2px; border-bottom:1px solid transparent; white-space:nowrap;
+  /* 6px of vertical padding put these targets at 30px — under the comfort floor
+     and cramped beside the 34px tools. The header row is sized by the brand
+     block, so the taller hit area costs no height. The teal rule moved to an
+     ::after pinned near the text so it still reads as an underline, not as a
+     stray line floating at the bottom of a tall box. */
+  padding:13px 2px; white-space:nowrap;
 }
-nav.main a:hover{color:var(--ink); text-decoration:none; border-bottom-color:var(--teal)}
+nav.main a::after{content:""; position:absolute; left:0; right:0; bottom:8px; height:1px;
+  background:transparent; transition:background .18s ease}
+nav.main a:hover{color:var(--ink); text-decoration:none}
+nav.main a:hover::after{background:var(--teal)}
+/* the reading position — drawn in the nav and announced as aria-current="location" */
+nav.main a.on{color:var(--ink)}
+nav.main a.on::after{background:var(--teal); height:2px}
+@media (prefers-reduced-motion:reduce){nav.main a::after{transition:none}}
 .hd-tools{margin-left:auto; display:flex; align-items:center; gap:12px}
 .hd-tel{display:none; font:500 12.5px var(--mono); color:var(--ink2); letter-spacing:.05em; white-space:nowrap}
 .hd-tel:hover{color:var(--teal2); text-decoration:none}
@@ -817,6 +837,9 @@ footer.site{border-top:1px solid var(--line); background:var(--bg0)}
   color:var(--ink); text-decoration:none;
 }
 .pal-item:hover,.pal-item:focus-visible{background:rgba(0,161,191,.14); text-decoration:none}
+/* below 1100px the menu IS the nav, so it carries the reading position too */
+.pal-item[aria-current="location"]{box-shadow:inset 3px 0 0 var(--teal); background:rgba(0,161,191,.09)}
+.pal-item[aria-current="location"] .pi-h{color:var(--teal2)}
 .pal-item .pi-l{font:500 14px var(--sans); color:var(--ink)}
 .pal-item .pi-h{margin-left:auto; font:400 11px var(--mono); letter-spacing:.1em; color:var(--ink3); white-space:nowrap}
 .pal-div{margin:6px 8px; border-top:1px solid var(--line)}
@@ -2008,6 +2031,42 @@ window.addEventListener("scroll", onHd, {passive:true}); onHd();
       '<span class="pi-l">'+it.l+'</span><span class="pi-h">'+it.h+'</span></a></li>';
   }
   list.innerHTML = SECTIONS.map(itemHtml).join("") + '<li class="pal-div" role="presentation"></li>' + ACTIONS.map(itemHtml).join("");
+
+  /* scroll spy: mark the section being read, in the header nav above 1100px and
+     in this menu below it, so the reading position survives at every width.
+     Announced to assistive tech as aria-current="location". */
+  (function(){
+    var sets = ["nav.main a[href^='#']", "#palList .pal-item[href^='#']"].map(function(sel){
+      var links = $$(sel);
+      return { links: links, targets: links.map(function(a){
+        try { return $(a.getAttribute("href")); } catch(e){ return null; }
+      }) };
+    }).filter(function(s){ return s.links.length; });
+    if(!sets.length) return;
+    var ticking = false;
+    function mark(){
+      ticking = false;
+      var line = window.scrollY + window.innerHeight * 0.3;
+      sets.forEach(function(s){
+        var idx = -1;
+        for(var i = 0; i < s.targets.length; i++){
+          var t = s.targets[i];
+          if(t && t.getBoundingClientRect().top + window.scrollY <= line) idx = i;
+        }
+        for(var j = 0; j < s.links.length; j++){
+          var on = j === idx;
+          s.links[j].classList.toggle("on", on);
+          if(on) s.links[j].setAttribute("aria-current", "location");
+          else s.links[j].removeAttribute("aria-current");
+        }
+      });
+    }
+    function onScroll(){ if(!ticking){ ticking = true; requestAnimationFrame(mark); } }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    mark();
+  })();
+
   var lastFocus = null;
   function open(){
     lastFocus = document.activeElement;
